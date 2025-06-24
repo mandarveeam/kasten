@@ -19,6 +19,13 @@ docker run --rm -v $HOME/.docker:/home/kio/.docker \
 
 ## 📥 Step 2: Download the K10 Helm Chart (v8.0.2)
 
+
+Add Helm repo if not already present
+
+```bash
+helm repo add kasten https://charts.kasten.io/
+```
+
 Run the following command to download the chart as a `.tgz` archive:
 
 ```bash
