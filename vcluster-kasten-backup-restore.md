@@ -131,6 +131,4 @@ Data was restored to an alternate PVC successfully. Useful for:
 
 ## Next Steps
 
-- Automate vcluster backup + restore with GitOps or CI/CD pipelines.
-- Add backup policies to trigger based on resource creation or changes.
-- Explore restoring vclusters to different host clusters for cross-cluster DR.
+- Further testing required to troubleshoot PVC only restore. 
