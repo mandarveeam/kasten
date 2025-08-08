@@ -87,10 +87,63 @@ Use this token for authenticating API calls to Kasten K10 or in external tools l
 
 ## Apply the Manifest
 
+
+<details>
+<summary>📦 otel-deployment.yaml</summary>
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vbr-admin
+  namespace: kasten-io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vbr-admin-k10-access
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k10-admin
+subjects:
+  - kind: ServiceAccount
+    name: vbr-admin
+    namespace: kasten-io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vbr-admin-kasten-access
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kasten-admin
+subjects:
+  - kind: ServiceAccount
+    name: vbr-admin
+    namespace: kasten-io
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vbr-admin-token
+  namespace: kasten-io
+  annotations:
+    kubernetes.io/service-account.name: vbr-admin
+type: kubernetes.io/service-account-token
+
+```
+
+</details>
+
+
+
 ```bash
 kubectl apply -f vbr-admin-access.yaml
 ```
 
 Ensure the Kasten K10 Helm deployment was done with `auth.mode=token` or compatible.
+
 
 ---
