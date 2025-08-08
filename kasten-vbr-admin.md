@@ -89,7 +89,7 @@ Use this token for authenticating API calls to Kasten K10 or in external tools l
 
 
 <details>
-<summary>📦 otel-deployment.yaml</summary>
+<summary>vbr-admin-access.yaml</summary>
 
 ```yaml
 apiVersion: v1
