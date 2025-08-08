@@ -1,0 +1,11 @@
+We had backed up namespace called core-support (this namespace currently utilizes File Mode PVC)
+We created a new Storage policy with following parameters in the VCenter UI(Enable rules for vSAN storage >> Failure Tolerence=1, RAID = 1 Mirrored.)
+Then added the new policy for storage provisioning in the Guest Cluster Storage in vCenter UI. (This generates block mode storage class in the Supervisor Cluster)
+Invoked / created sc in the guest cluster referring supervisor Cluster Storage class. 
+Tested the newly created Storage class for snapshot capabilities. 
+Created a Transform set in Kasten that transforms old Storage Class "vsphere-with-tanzu-storage-policy" to new storage class "vsphere-block-sc".
+Created Restore in Kasten UI and referenced the transform set created before. 
+Performed the restore of core-support namespace to core-support-restore namespace 
+The restore job successfully restored data to the block mode PVC. (App did not come up in running status due to lack of resources on the guest cluster.)
+Created an S3 Location profile. 
+Created 2ndary backup policy to test S3 Location Profile. (the export did not work again due to lack of resources on guest cluster.)
