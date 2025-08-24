@@ -4,7 +4,7 @@ This document explains how to set up a single-node K3s cluster and install the N
 
 ## Prerequisites
 
-- A Linux VM or bare-metal server (tested on Ubuntu/Debian)
+- A Linux VM or bare-metal server (tested on Alpine)
 - User with `sudo` privileges
 - `helm` installed
 - `kubectl` installed
