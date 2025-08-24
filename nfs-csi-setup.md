@@ -46,7 +46,7 @@ metadata:
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: nfs.csi.k8s.io
 parameters:
-  server: localhost
+  server: nfsserver
   share: /data
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
@@ -65,7 +65,7 @@ EOF
 
 This creates:
 
-- A default StorageClass (`nfs-csi`) pointing to `localhost:/data`
+- A default StorageClass (`nfs-csi`) pointing to `nfsserver:/data`
 - A VolumeSnapshotClass (`csi-nfs-snapclass`) for backups and restores
 
 ---
