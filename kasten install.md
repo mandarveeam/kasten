@@ -18,6 +18,13 @@ helm install k10 kasten/k10 \
   --set global.persistence.storageClass=nfs-csi
 ```
 ---
+# Make sure Storage class is annotated
+Replace your storageclass name and volumesnapshotclass name 
+
+```bash
+kubectl annotate storageclass nfs-csi k10.kasten.io/volume-snapshot-class=csi-nfs-snapclass
+```
+---
 # NFS Location Profile
 To Use NFS as location profile create 2 yamls files and apply them. 
 pv.yaml Replace your nfs version, Path, Server name. 
