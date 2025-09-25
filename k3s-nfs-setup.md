@@ -171,7 +171,7 @@ You now have:
 - A working test PVC and Pod
 ---
 
-# Optional Install NFS Locally
+## Optional Install NFS Locally
 use following script to install and configure NFS server. 
 
 ```bash
@@ -202,3 +202,52 @@ sudo systemctl start nfs-kernel-server
 
 echo "NFS share /share created and exported successfully."
 ```
+
+--- 
+## Optional Before setting up make sure the IP is static IP 
+
+```bash
+
+#!/bin/bash
+set -e
+
+API_IF="enp2s0"
+
+# Gather details
+API_IP=$(ip -4 addr show dev $API_IF | awk '/inet / {print $2}' | cut -d/ -f1)
+API_MASK=$(ip -4 addr show dev $API_IF | awk '/inet / {print $2}' | cut -d/ -f2)
+API_GW=$(ip route | awk '/default/ && $5=="'$API_IF'" {print $3}')
+
+echo "Detected:"
+echo " Interface : $API_IF"
+echo " IP        : $API_IP"
+echo " Mask      : $API_MASK"
+echo " Gateway   : $API_GW"
+
+# Backup existing netplan configs
+sudo mkdir -p /etc/netplan/backup
+sudo cp /etc/netplan/*.yaml /etc/netplan/backup/ 2>/dev/null || true
+
+# Write new config
+sudo tee /etc/netplan/01-netcfg.yaml > /dev/null <<EOF
+network:
+  version: 2
+  ethernets:
+    enp1s0:
+      dhcp4: true
+    $API_IF:
+      addresses:
+        - ${API_IP}/${API_MASK}
+      gateway4: ${API_GW}
+      nameservers:
+        addresses: [${API_GW},8.8.8.8]
+EOF
+
+# Apply config
+sudo netplan generate
+sudo netplan apply
+
+echo "Netplan updated successfully. $API_IF is now static at $API_IP"
+
+```
+---
