@@ -135,7 +135,7 @@ spec:
       image: busybox
       command: [ "sleep", "3600" ]
       volumeMounts:
-        - mountPath: "/data"
+        - mountPath: "/share"
           name: test-volume
   volumes:
     - name: test-volume
@@ -155,8 +155,8 @@ Once the pod is running, you can exec into it and verify storage:
 ```bash
 kubectl exec -it test-pod -- sh
 # inside pod
-echo "hello world" > /data/hello.txt
-cat /data/hello.txt
+echo "hello world" > /share/hello.txt
+cat /share/hello.txt
 ```
 
 ---
