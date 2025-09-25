@@ -169,3 +169,36 @@ You now have:
 - NFS CSI driver installed
 - Default StorageClass and SnapshotClass
 - A working test PVC and Pod
+
+
+#Optional Install NFS Locally
+use following script to install and configure NFS server. 
+
+```bash
+
+#!/bin/bash
+set -e
+
+# Create the shared folder
+sudo mkdir -p /share
+sudo chown nobody:nogroup /share
+sudo chmod 777 /share
+
+# Update packages and install NFS server
+sudo apt update -y
+sudo apt install -y nfs-kernel-server
+
+# Add /share to exports if not already present
+if ! grep -q "^/share" /etc/exports; then
+    echo "/share *(rw,sync,no_subtree_check,no_root_squash)" | sudo tee -a /etc/exports
+fi
+
+# Apply export changes
+sudo exportfs -ra
+
+# Enable and start NFS services
+sudo systemctl enable nfs-kernel-server
+sudo systemctl start nfs-kernel-server
+
+echo "NFS share /share created and exported successfully."
+```
