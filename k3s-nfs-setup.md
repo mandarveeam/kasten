@@ -65,7 +65,7 @@ metadata:
 provisioner: nfs.csi.k8s.io
 parameters:
   server: localhost
-  share: /data
+  share: /share
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
@@ -83,7 +83,7 @@ EOF
 
 This creates:
 
-- A default StorageClass (`nfs-csi`) pointing to `localhost:/data`
+- A default StorageClass (`nfs-csi`) pointing to `localhost:/share`
 - A VolumeSnapshotClass (`csi-nfs-snapclass`) for backups and restores
 
 ---
