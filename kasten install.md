@@ -25,7 +25,7 @@ Replace your storageclass name and volumesnapshotclass name
 kubectl annotate storageclass nfs-csi k10.kasten.io/volume-snapshot-class=csi-nfs-snapclass
 ```
 ---
-# NFS Location Profile
+# NFS PV and PVC for Location Profile
 To Use NFS as location profile create 2 yamls files and apply them. 
 pv.yaml Replace your nfs version, Path, Server name. 
 
