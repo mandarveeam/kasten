@@ -169,7 +169,7 @@ You now have:
 - NFS CSI driver installed
 - Default StorageClass and SnapshotClass
 - A working test PVC and Pod
-
+---
 
 ##Optional Install NFS Locally
 use following script to install and configure NFS server. 
