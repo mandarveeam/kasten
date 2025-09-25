@@ -17,3 +17,44 @@ helm install k10 kasten/k10 \
   --set auth.tokenAuth.enabled=true \
   --set global.persistence.storageClass=nfs-csi
 ```
+---
+# NFS Location Profile
+To Use NFS as location profile create 2 yamls files and apply them. 
+pv.yaml Replace your nfs version, Path, Server name. 
+
+```bash
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+   name: localnfspv
+spec:
+   capacity:
+      storage: 10Gi
+   volumeMode: Filesystem
+   accessModes:
+      - ReadWriteMany
+   persistentVolumeReclaimPolicy: Retain
+   storageClassName: nfs-csi 
+   mountOptions:
+      - hard
+      - nfsvers=3
+   nfs:
+      path: /share
+      server: localhost
+```
+
+pvc.yaml 
+```bash
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+   name: k10nfs
+   namespace: kasten-io
+spec:
+   storageClassName: nfs-csi 
+   accessModes:
+      - ReadWriteMany
+   resources:
+      requests:
+         storage: 10Gi
+```
