@@ -211,12 +211,20 @@ echo "NFS share /share created and exported successfully."
 #!/bin/bash
 set -e
 
+# The network interface to configure
 API_IF="enp2s0"
 
-# Gather details
+# Get current IP/mask/gateway
+echo "Detecting network configuration for interface: $API_IF..."
 API_IP=$(ip -4 addr show dev $API_IF | awk '/inet / {print $2}' | cut -d/ -f1)
 API_MASK=$(ip -4 addr show dev $API_IF | awk '/inet / {print $2}' | cut -d/ -f2)
-API_GW=$(ip route | awk '/default/ && $5=="'$API_IF'" {print $3}')
+API_GW=$(ip route | awk '/default/ && $5=="'$API_IF'" {print $3}' | sort -u | head -n1)
+
+# Check if required variables are found
+if [[ -z "$API_IP" || -z "$API_MASK" || -z "$API_GW" ]]; then
+    echo "Error: Could not detect IP, Mask, or Gateway. Please check the network interface '$API_IF' and your connectivity."
+    exit 1
+fi
 
 echo "Detected:"
 echo " Interface : $API_IF"
@@ -224,12 +232,17 @@ echo " IP        : $API_IP"
 echo " Mask      : $API_MASK"
 echo " Gateway   : $API_GW"
 
-# Backup existing netplan configs
+# Backup old netplan config
+echo "Backing up existing Netplan configuration..."
 sudo mkdir -p /etc/netplan/backup
-sudo cp /etc/netplan/*.yaml /etc/netplan/backup/ 2>/dev/null || true
+if [ -f /etc/netplan/50-cloud-init.yaml ]; then
+  sudo cp /etc/netplan/50-cloud-init.yaml /etc/netplan/backup/50-cloud-init.yaml.$(date +%s)
+  echo "Backup created at /etc/netplan/backup/"
+fi
 
-# Write new config
-sudo tee /etc/netplan/01-netcfg.yaml > /dev/null <<EOF
+# Write new netplan config
+echo "Writing new Netplan configuration to /etc/netplan/50-cloud-init.yaml..."
+cat <<EOF | sudo tee /etc/netplan/50-cloud-init.yaml > /dev/null
 network:
   version: 2
   ethernets:
@@ -238,16 +251,22 @@ network:
     $API_IF:
       addresses:
         - ${API_IP}/${API_MASK}
-      gateway4: ${API_GW}
+      routes:
+        - to: default
+          via: ${API_GW}
       nameservers:
-        addresses: [${API_GW},8.8.8.8]
+        addresses: [${API_GW}, 8.8.8.8]
 EOF
 
+# Fix permissions
+sudo chown root:root /etc/netplan/50-cloud-init.yaml
+sudo chmod 600 /etc/netplan/50-cloud-init.yaml
+
 # Apply config
+echo "Generating and applying new configuration..."
 sudo netplan generate
 sudo netplan apply
 
-echo "Netplan updated successfully. $API_IF is now static at $API_IP"
-
+echo "✅ Netplan updated successfully. $API_IF is now static at $API_IP"
 ```
 ---
