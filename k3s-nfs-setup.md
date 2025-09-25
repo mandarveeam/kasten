@@ -171,7 +171,7 @@ You now have:
 - A working test PVC and Pod
 
 
-#Optional Install NFS Locally
+##Optional Install NFS Locally
 use following script to install and configure NFS server. 
 
 ```bash
