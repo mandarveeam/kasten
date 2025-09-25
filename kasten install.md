@@ -65,6 +65,21 @@ spec:
       requests:
          storage: 10Gi
 ```
+
+location profile with profile.yaml
+```bash
+kind: Profile
+apiVersion: config.kio.kasten.io/v1alpha1
+metadata:
+  name: nfs
+  namespace: kasten-io
+spec:
+  locationSpec:
+    type: FileStore
+    fileStore:
+      claimName: k10nfs
+  type: Location
+```
 ---
 
 ## Kasten K10 Service Account Setup
