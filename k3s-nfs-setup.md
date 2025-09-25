@@ -7,6 +7,11 @@ This document explains how to set up a single-node K3s cluster and install the N
 - A Linux VM or bare-metal server (tested on Alpine)
 - User with `sudo` privileges
 - `helm` installed
+- ```bash
+  wget https://get.helm.sh/helm-v3.19.0-linux-amd64.tar.gz
+  tar -xzvf helm-v3.19.0-linux-amd64.tar.gz
+  sudo install linux-amd64/helm /usr/bin
+  ```
 - `kubectl` installed
 - NFS server available (can be local or remote)
 
