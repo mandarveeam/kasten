@@ -65,3 +65,33 @@ Deploy Sample app
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/mandarveeam/kasten/refs/heads/main/sample-app.yaml
 ```
+
+
+Install Kasten 
+
+```bash
+
+helm repo add kasten https://charts.kasten.io
+helm install k10 kasten/k10 \
+--namespace 'kasten-io' \
+--create-namespace \
+--set "externalGateway.create=true" \
+--set "auth.tokenAuth.enabled=true"
+
+```
+Create Service Account 
+
+```bash
+```
+
+Create Login Token 
+
+```bash
+```
+
+
+
+```bash
+```
+
+
