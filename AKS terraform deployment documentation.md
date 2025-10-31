@@ -58,3 +58,10 @@ Once deployed, retrieve credentials using:
 ```bash
 terraform output -raw kubeconfig > kubeconfig.yaml
 ```
+
+
+Deploy Sample app
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/mandarveeam/kasten/refs/heads/main/sample-app.yaml
+```
