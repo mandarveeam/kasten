@@ -13,36 +13,7 @@ This Terraform configuration provisions a complete Azure environment for Kasten 
 
 ---
 
-### 2. **Azure Storage Account**
-- **Name:** `${var.prefix}stgacct`
-- **Purpose:** Used for Kasten backups and object storage (blob container)
-- **Features:**
-  - Replication: `LRS` (Locally Redundant Storage)
-  - Account Tier: Standard
-
----
-
-### 3. **Azure AD Application**
-- **Name:** `${var.prefix}-kasten-app`
-- **Purpose:** Represents the application identity for Kasten K10 to interact with Azure APIs.
-
----
-
-### 4. **Azure AD Service Principal**
-- **Name:** `${var.prefix}-kasten-sp`
-- **Purpose:** Enables secure API access using the Kasten application credentials.
-
----
-
-### 5. **Service Principal Password**
-- **Purpose:** Authentication secret for the Service Principal.
-- **Output Variables:**
-  - `kasten_sp_client_id`
-  - `kasten_sp_client_secret`
-
----
-
-### 6. **Azure AKS Cluster**
+### 2. **Azure AKS Cluster**
 - **Name:** `${var.prefix}-aks`
 - **Purpose:** The Kubernetes cluster where Kasten K10 will be installed.
 - **Configuration:**
@@ -54,7 +25,7 @@ This Terraform configuration provisions a complete Azure environment for Kasten 
 
 ---
 
-### 7. **Outputs**
+### 3. **Outputs**
 After running `terraform apply`, the following outputs are displayed:
 
 | Output Name               | Description |
@@ -85,5 +56,5 @@ terraform apply
 Once deployed, retrieve credentials using:
 
 ```bash
-az aks get-credentials --resource-group <prefix>-rg --name <prefix>-aks
+terraform output -raw kubeconfig > kubeconfig.yaml
 ```
