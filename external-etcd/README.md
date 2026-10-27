@@ -223,12 +223,3 @@ SSH uses `StrictHostKeyChecking=no`, which works but skips host key verification
 ## Limitations
 
 This setup targets a **single etcd member on amd64**. It uses one endpoint for backup and one `ssh_host` for restore. A multi-member cluster would need every member restored together. Each restore leaves an extra data-dir and unit backup on the host. kubeadm static-pod etcd and managed control planes are not supported.
-
-## What differs from the in-cluster objects
-
-The logic is unchanged. The only differences from the objects exported from the cluster are:
-
-- **Removed server-generated fields:** `uid`, `resourceVersion`, `generation`, `creationTimestamp`, `status`, the `last-applied-configuration` annotation, and `createdBy`/`modifiedBy`/`lastModifyHash`. These make `apply` fail or conflict on another cluster.
-- **Added to the policy:** its missing `apiVersion` and `kind`.
-- **Script blocks rewritten as YAML literal blocks (`|`).** This exactly reproduces the scripts you originally applied; the `>` folding you saw in `oc get` output was only display formatting.
-- **`set -x` commented out**, as described above.
