@@ -1,0 +1,38 @@
+# -----------------------------------------------------------------------------
+# Kasten Policy - on-demand backup of the etcd-details Secret in "etcd-backup".
+# Same spec as the working in-cluster policy "test"; only server-generated
+# fields (createdBy, modifiedBy, lastModifyHash, status, uid, ...) were removed
+# and apiVersion/kind added so the file can be applied from Git.
+# -----------------------------------------------------------------------------
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: test
+  namespace: kasten-io
+spec:
+  frequency: "@onDemand"
+  # For scheduled backups, change frequency (e.g. "@daily") and uncomment
+  # retention (required for scheduled policies):
+  # retention:
+  #   daily: 7
+  #   weekly: 4
+  #   monthly: 12
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/appNamespace
+        operator: In
+        values:
+          - etcd-backup
+  actions:
+    - action: backup
+      backupParameters:
+        filters:
+          includeResources:
+            - matchExpressions:
+                - key: include
+                  operator: In
+                  values:
+                    - "true"
+        profile:
+          name: s3
+          namespace: kasten-io

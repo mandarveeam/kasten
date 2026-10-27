@@ -1,0 +1,193 @@
+# -----------------------------------------------------------------------------
+# etcd-blueprint - Kanister Blueprint for Veeam Kasten
+#
+# Backs up and restores an external, systemd-managed etcd member.
+# Bound to a Secret (see etcd-details-secret.example.yaml) via the annotation
+#   kanister.kasten.io/blueprint: etcd-blueprint
+#
+# Logic is identical to the working in-cluster version; the only change is that
+# 'set -x' is commented out (see note in each script). See README.md.
+# -----------------------------------------------------------------------------
+apiVersion: cr.kanister.io/v1alpha1
+kind: Blueprint
+metadata:
+  name: etcd-blueprint
+  namespace: kasten-io
+actions:
+  backup:
+    outputArtifacts:
+      cloudObject:
+        keyValue:
+          backupLocation: "{{ .Phases.takeSnapshotAndUpload.Output.backupLocation }}"
+    phases:
+      - func: KubeTask
+        name: takeSnapshotAndUpload
+        args:
+          image: ghcr.io/kanisterio/kanister-kubectl-1.18:0.119.0
+          command:
+            - sh
+            - -o
+            - errexit
+            - -o
+            - pipefail
+            - -c
+            - |
+              # set -x disabled: it printed the decoded certs/keys and the location-profile
+              # credentials into the job logs. Uncomment temporarily only for debugging.
+              # set -x
+              ETCD_VER=v3.5.9
+
+              microdnf install -y tar gzip
+
+              curl -L --max-time 30 --retry 2 -o /tmp/etcd.tar.gz \
+                "https://github.com/etcd-io/etcd/releases/download/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz"
+              tar -xzf /tmp/etcd.tar.gz -C /tmp
+              chmod +x /tmp/etcd-${ETCD_VER}-linux-amd64/etcdctl
+
+              echo "{{ index .Object.data "cacert" | toString | b64dec }}" > /tmp/ca.crt
+              echo "{{ index .Object.data "cert" | toString | b64dec }}" > /tmp/client.crt
+              echo "{{ index .Object.data "key" | toString | b64dec }}" > /tmp/client.key
+              export ENDPOINTS="{{ index .Object.data "endpoints" | toString | b64dec }}"
+
+              ETCDCTL_API=3 /tmp/etcd-${ETCD_VER}-linux-amd64/etcdctl \
+                --endpoints=$ENDPOINTS \
+                --cacert=/tmp/ca.crt --cert=/tmp/client.crt --key=/tmp/client.key \
+                snapshot save /tmp/etcd-backup.db
+
+              gzip -c /tmp/etcd-backup.db > /tmp/etcd-backup.db.gz
+
+              BACKUP_LOCATION="etcd_backups/{{ .Object.metadata.namespace }}/{{ toDate "2006-01-02T15:04:05.999999999Z07:00" .Time | date "2006-01-02T15:04:05Z07:00" }}/etcd-backup.db.gz"
+              kando location push /tmp/etcd-backup.db.gz --profile '{{ toJson .Profile }}' --path "$BACKUP_LOCATION" -v debug
+              kando output backupLocation "$BACKUP_LOCATION"
+  restore:
+    inputArtifactNames:
+      - cloudObject
+    phases:
+      - func: KubeTask
+        name: restoreEtcdSnapshot
+        args:
+          image: ghcr.io/kanisterio/kanister-kubectl-1.18:0.119.0
+          namespace: "{{ .Object.metadata.namespace }}"
+          command:
+            - sh
+            - -o
+            - errexit
+            - -o
+            - pipefail
+            - -c
+            - |
+              # set -x disabled: it printed the decoded certs/keys and the location-profile
+              # credentials into the job logs. Uncomment temporarily only for debugging.
+              # set -x
+              microdnf install -y openssh-clients gzip tar
+
+              # --- Pull the exact snapshot for the chosen point-in-time restore ---
+              kando location pull --profile '{{ toJson .Profile }}' --path '{{ .ArtifactsIn.cloudObject.KeyValue.backupLocation }}' /tmp/etcd-restore-snapshot.db.gz -v debug
+              gunzip -f /tmp/etcd-restore-snapshot.db.gz
+
+              # --- SSH setup ---
+              echo "{{ index .Object.data "sshkey" | toString | b64dec }}" > /tmp/id_rsa
+              chmod 600 /tmp/id_rsa
+              SSH_HOST="{{ index .Object.data "ssh_host" | toString | b64dec }}"
+              SSH_USER="{{ index .Object.data "ssh_user" | toString | b64dec }}"
+              SSH="ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST}"
+
+              # --- Copy the snapshot onto the etcd host ---
+              # NOTE: deliberately NOT using scp/sftp here. Modern OpenSSH scp clients
+              # default to the SFTP protocol, which requires the remote sshd to have the
+              # "sftp" subsystem enabled - if it isn't (or the account's shell/session is
+              # restricted, common with GCP OS Login), scp fails with:
+              #   "subsystem request failed on channel 0 / scp: Connection closed"
+              # Piping the file through a plain ssh command needs nothing but a working
+              # shell on the remote end, which is already required for the rest of this
+              # script - so it can't introduce a NEW failure mode.
+              $SSH 'cat > /tmp/etcd-restore-snapshot.db' < /tmp/etcd-restore-snapshot.db
+
+              # --- Remote script: auto-discovers the running etcd's own config, then
+              #     stops it, restores the snapshot into a NEW data-dir, repoints the
+              #     service at it, and restarts + health-checks it. Nothing here needs
+              #     to be known in advance - it reads the live process' own flags. ---
+              $SSH 'bash -s' <<'REMOTE_SCRIPT'
+              set -euo pipefail
+
+              # /proc/<pid>/cmdline for another user's process may not be readable
+              # without elevated privileges either - read it via sudo to be safe
+              ETCD_PID=$(pgrep -x etcd | head -1)
+              if [ -z "$ETCD_PID" ]; then
+                echo "ERROR: no running etcd process found - cannot auto-discover config" >&2
+                exit 1
+              fi
+              CMDLINE=$(sudo tr '\0' '\n' < /proc/$ETCD_PID/cmdline 2>/dev/null || tr '\0' '\n' < /proc/$ETCD_PID/cmdline)
+              get_flag() { echo "$CMDLINE" | grep -- "^--$1=" | sed "s/^--$1=//" ; }
+
+              ETCD_NAME=$(get_flag name)
+              DATA_DIR=$(get_flag data-dir)
+              INITIAL_CLUSTER=$(get_flag initial-cluster)
+              INITIAL_ADVERTISE_PEER_URLS=$(get_flag initial-advertise-peer-urls)
+              LISTEN_CLIENT_URLS=$(get_flag listen-client-urls)
+              CERT_FILE=$(get_flag cert-file)
+              KEY_FILE=$(get_flag key-file)
+              CA_FILE=$(get_flag trusted-ca-file)
+
+              echo "Discovered: name=$ETCD_NAME data-dir=$DATA_DIR initial-cluster=$INITIAL_CLUSTER"
+
+              SERVICE_NAME=$(systemctl list-units --type=service --all --no-legend 2>/dev/null | awk '{print $1}' | grep -i etcd | head -1)
+              SERVICE_NAME=${SERVICE_NAME:-etcd.service}
+
+              # find which OS user the service itself runs as, so the restored
+              # data-dir can be handed back to that user (not left owned by "gcp")
+              SERVICE_USER=$(systemctl show -p User --value "$SERVICE_NAME" 2>/dev/null)
+              SERVICE_USER=${SERVICE_USER:-root}
+              SERVICE_GROUP=$(systemctl show -p Group --value "$SERVICE_NAME" 2>/dev/null)
+              SERVICE_GROUP=${SERVICE_GROUP:-$SERVICE_USER}
+
+              sudo systemctl stop "$SERVICE_NAME"
+
+              NEW_DATA_DIR="${DATA_DIR%/}-restored-$(date +%s)"
+              NEW_TOKEN="etcd-restore-$(date +%s)"
+
+              # writes into system paths (e.g. /var/lib/etcd-*) - gcp needs sudo here
+              sudo ETCDCTL_API=3 etcdctl snapshot restore /tmp/etcd-restore-snapshot.db \
+                --name "$ETCD_NAME" \
+                --initial-cluster "$INITIAL_CLUSTER" \
+                --initial-advertise-peer-urls "$INITIAL_ADVERTISE_PEER_URLS" \
+                --initial-cluster-token "$NEW_TOKEN" \
+                --data-dir "$NEW_DATA_DIR"
+
+              # hand the new data-dir back to whatever user the etcd service
+              # actually runs as (systemd's User=), or it won't be able to read it
+              sudo chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "$NEW_DATA_DIR"
+
+              UNIT_FILE=$(systemctl show -p FragmentPath "$SERVICE_NAME" | cut -d= -f2)
+              sudo cp "$UNIT_FILE" "${UNIT_FILE}.bak.$(date +%s)"
+              sudo sed -i "s#--data-dir=${DATA_DIR}#--data-dir=${NEW_DATA_DIR}#" "$UNIT_FILE"
+              sudo sed -i "s#--initial-cluster-token=[^ ]*#--initial-cluster-token=${NEW_TOKEN}#" "$UNIT_FILE" || true
+
+              sudo systemctl daemon-reload
+              sudo systemctl start "$SERVICE_NAME"
+              sleep 5
+
+              # cert files are typically root-only readable - use sudo here too
+              sudo ETCDCTL_API=3 etcdctl --endpoints="$LISTEN_CLIENT_URLS" \
+                --cacert="$CA_FILE" --cert="$CERT_FILE" --key="$KEY_FILE" \
+                endpoint health
+              echo "Restore complete. New data-dir: $NEW_DATA_DIR (old data-dir left untouched at $DATA_DIR)"
+              REMOTE_SCRIPT
+  delete:
+    inputArtifactNames:
+      - cloudObject
+    phases:
+      - func: KubeTask
+        name: deleteFromObjectStore
+        args:
+          image: ghcr.io/kanisterio/kanister-kubectl-1.18:0.119.0
+          namespace: "{{ .Object.metadata.namespace }}"
+          command:
+            - sh
+            - -o
+            - errexit
+            - -o
+            - pipefail
+            - -c
+            - |
+              kando location delete --profile '{{ toJson .Profile }}' --path '{{ .ArtifactsIn.cloudObject.KeyValue.backupLocation }}' -v debug
